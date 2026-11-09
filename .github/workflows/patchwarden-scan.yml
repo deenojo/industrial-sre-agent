@@ -60,6 +60,8 @@ jobs:
           vra summary | tee reports/summary.txt
           vra triage --backend heuristic --code-root backend -v | tee reports/triage.txt
           vra report --out reports/dashboard/index.html
+          echo "=== remediation plan (dry run, opens nothing) ==="
+          vra remediate --mode plan --repo-root . | tee reports/remediate-plan.txt || true
 
       - name: Job summary
         if: always()
