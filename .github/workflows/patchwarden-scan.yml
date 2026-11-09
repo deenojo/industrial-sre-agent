@@ -1,0 +1,69 @@
+# One-off: run Patchwarden (github.com/deenojo/Vulnerability-Remediation-Agent) against this repo.
+# Scans the Python backend and Node frontend, dedupes across scanners, triages by reachability,
+# and uploads a dashboard. Read-only: opens no PRs. Trigger from the Actions tab.
+name: patchwarden-scan
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [patchwarden-scan]
+
+permissions:
+  contents: read
+
+jobs:
+  patchwarden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Patchwarden
+        run: pip install "git+https://github.com/deenojo/Vulnerability-Remediation-Agent@main"
+
+      - name: Install scanners
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSL -o /usr/local/bin/osv-scanner https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_amd64
+          chmod +x /usr/local/bin/osv-scanner
+          trivy --version && osv-scanner --version
+
+      - name: Pin backend dependencies (so ranges resolve to real versions)
+        run: |
+          python -m pip install -r backend/requirements.txt
+          mkdir -p reports
+          pip freeze > reports/requirements.txt   # named so osv-scanner recognizes it
+
+      - name: Run scanners
+        run: |
+          trivy fs --scanners vuln --format json --output reports/trivy-fs.json . || true
+          osv-scanner --format json --output reports/osv.json \
+            --lockfile reports/requirements.txt \
+            --lockfile frontend/package-lock.json || true
+
+      - name: Patchwarden ingest + triage + report
+        run: |
+          vra ingest --trivy-fs reports/trivy-fs.json --osv reports/osv.json --json-out reports/findings.json
+          vra summary | tee reports/summary.txt
+          vra triage --backend heuristic --code-root backend -v | tee reports/triage.txt
+          vra report --out reports/dashboard/index.html
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo '## Patchwarden scan — industrial-sre-agent'
+            echo '```'
+            cat reports/summary.txt 2>/dev/null || echo '(no summary)'
+            echo '```'
+            echo '_Full triaged findings + dashboard in the uploaded artifact._'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: patchwarden-reports
+          path: reports/
