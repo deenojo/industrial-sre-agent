@@ -24,11 +24,20 @@ jobs:
       - name: Install Patchwarden
         run: pip install "git+https://github.com/deenojo/Vulnerability-Remediation-Agent@main"
 
-      - name: Install scanners (pinned)
+      - name: Install scanners (pinned + sha256-verified)
         run: |
-          curl -sSL -o /tmp/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
+          fetch() {  # url  dest  sha256
+            for i in 1 2 3; do
+              curl -fsSL --retry 3 -o "$2" "$1" && echo "$3  $2" | sha256sum -c - && return 0
+              echo "attempt $i failed for $1"; sleep 5
+            done
+            echo "could not fetch $1"; exit 1
+          }
+          fetch https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz \
+            /tmp/trivy.tgz bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf
           tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
-          curl -sSL -o /usr/local/bin/osv-scanner https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64
+          fetch https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64 \
+            /usr/local/bin/osv-scanner 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b
           chmod +x /usr/local/bin/osv-scanner
           trivy --version && osv-scanner --version
 
