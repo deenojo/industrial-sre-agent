@@ -24,10 +24,11 @@ jobs:
       - name: Install Patchwarden
         run: pip install "git+https://github.com/deenojo/Vulnerability-Remediation-Agent@main"
 
-      - name: Install scanners
+      - name: Install scanners (pinned)
         run: |
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          curl -sSL -o /usr/local/bin/osv-scanner https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_amd64
+          curl -sSL -o /tmp/trivy.tgz https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
+          tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+          curl -sSL -o /usr/local/bin/osv-scanner https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64
           chmod +x /usr/local/bin/osv-scanner
           trivy --version && osv-scanner --version
 
