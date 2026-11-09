@@ -61,7 +61,8 @@ jobs:
           vra triage --backend heuristic --code-root backend -v | tee reports/triage.txt
           vra report --out reports/dashboard/index.html
           echo "=== remediation plan (dry run, opens nothing) ==="
-          vra remediate --mode plan --repo-root . | tee reports/remediate-plan.txt || true
+          curl -fsSL -o /tmp/policy.yaml https://raw.githubusercontent.com/deenojo/Vulnerability-Remediation-Agent/main/policy/policy.yaml
+          vra remediate --mode plan --repo-root . --policy /tmp/policy.yaml | tee reports/remediate-plan.txt || true
 
       - name: Job summary
         if: always()
